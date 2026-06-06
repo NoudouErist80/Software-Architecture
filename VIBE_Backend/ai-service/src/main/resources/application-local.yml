@@ -1,0 +1,54 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# LOCAL DEVELOPMENT PROFILE — ai-service
+# Usage: mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+#
+# This profile lets the AI service start cleanly on a developer machine
+# without needing Redis or Kafka running.
+#
+# What works locally without any extra services:
+#   ✅ All AI endpoints (/translate, /summarise, /detect-language, /languages)
+#   ✅ JWT validation (uses the same secret as auth-service local profile)
+#   ✅ Swagger UI at http://localhost:8087/swagger-ui/index.html
+#   ⚠️  Claude API calls need CLAUDE_API_KEY set (or will return a fallback)
+#   ℹ️  Redis down → caching disabled, responses always hit Claude API
+#   ℹ️  Kafka down → AI events simply not published (no crash)
+# ══════════════════════════════════════════════════════════════════════════════
+
+spring:
+  # Disable Kafka consumer auto-startup — avoids connection errors on startup
+  kafka:
+    listener:
+      auto-startup: false
+
+  # Redis connection — short timeouts so startup is not blocked if Redis is down
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: vibe_redis
+      timeout: 300ms
+      connect-timeout: 300ms
+
+# Disable Redis health indicator so /actuator/health stays UP without Redis
+management:
+  health:
+    redis:
+      enabled: false
+
+# Verbose logging for local debugging
+logging:
+  level:
+    com.vibe: DEBUG
+    org.springframework.security: DEBUG
+    io.lettuce: WARN
+    org.apache.kafka: WARN
+    org.springframework.data.redis: WARN
+    org.springframework.web: DEBUG
+
+vibe:
+  ai:
+    claude:
+      api-key: ${CLAUDE_API_KEY:}
+      api-url: https://api.anthropic.com/v1/messages
+      model: claude-sonnet-4-20250514
+      max-tokens: 1000    

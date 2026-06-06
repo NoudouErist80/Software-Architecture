@@ -1,0 +1,280 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --vibe-primary:   #0d94d4;
+    --vibe-deep:      #0077b6;
+    --vibe-light:     #e8f4fd;
+    --vibe-soft:      #b3d9f5;
+    --surface-bg:     #ffffff;
+    --surface-card:   #f8fafc;
+    --surface-hover:  #f0f7ff;
+    --surface-border: #d1e9f7;
+    --text-primary:   #0f172a;
+    --text-secondary: #475569;
+    --text-muted:     #94a3b8;
+    --accent-gold:    #f59e0b;
+    --accent-green:   #10b981;
+    --accent-red:     #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; width: 100%; font-family: 'DM Sans', sans-serif; background: #fff; color: #0f172a; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #b3d9f5; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #0d94d4; }
+  ::selection { background: #0d94d433; color: #0f172a; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-xl border border-sky-soft/50 rounded-2xl shadow-sm;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-sky-deep via-vibe-500 to-accent-cyan bg-clip-text text-transparent;
+  }
+  .btn-vibe {
+    @apply bg-vibe-600 hover:bg-vibe-500 text-white font-display font-semibold
+           px-6 py-2.5 rounded-xl transition-all duration-200
+           hover:shadow-lg hover:shadow-vibe-600/25 active:scale-95;
+  }
+  .btn-vibe-outline {
+    @apply border-2 border-vibe-600 text-vibe-600 hover:bg-vibe-50 font-display font-semibold
+           px-6 py-2.5 rounded-xl transition-all duration-200 active:scale-95;
+  }
+  .bubble-in {
+    @apply bg-white border border-surface-border text-gray-800 rounded-2xl rounded-tl-sm shadow-sm;
+  }
+  .bubble-out {
+    @apply bg-vibe-600 text-white rounded-2xl rounded-tr-sm shadow-sm;
+  }
+  .bubble-group-me {
+    @apply bg-vibe-50 border border-vibe-200 text-gray-800 rounded-2xl rounded-tl-sm border-l-4 border-l-vibe-500;
+  }
+  .bubble-group-other {
+    @apply bg-white border border-surface-border text-gray-800 rounded-2xl rounded-tl-sm shadow-sm;
+  }
+  .nav-item {
+    @apply flex flex-col items-center gap-1 px-4 py-2 rounded-xl cursor-pointer
+           text-gray-400 hover:text-vibe-600 transition-all duration-200;
+  }
+  .nav-item.active { @apply text-vibe-600; }
+  .sidebar-item {
+    @apply flex items-center gap-3 p-3 rounded-xl cursor-pointer
+           text-gray-500 hover:text-gray-800 hover:bg-surface-hover transition-all duration-200;
+  }
+  .sidebar-item.active {
+    @apply text-vibe-700 bg-vibe-50 border border-vibe-200;
+  }
+  .token-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           bg-amber-50 border border-amber-200 text-amber-700 text-xs font-mono font-medium;
+  }
+  .notif-dot {
+    @apply absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full
+           flex items-center justify-center text-[9px] font-bold text-white;
+  }
+  .skeleton {
+    @apply bg-gradient-to-r from-surface-card via-surface-hover to-surface-card
+           bg-[length:200%_100%] animate-shimmer rounded-lg;
+  }
+  .vibe-input {
+    @apply w-full bg-white border border-surface-border rounded-xl px-4 py-2.5 text-gray-800 text-sm
+           focus:outline-none focus:border-vibe-500 focus:ring-2 focus:ring-vibe-100 transition-all
+           placeholder:text-gray-400;
+  }
+  .card-white {
+    @apply bg-white border border-surface-border rounded-2xl shadow-sm;
+  }
+  .section-header {
+    @apply px-4 py-3 border-b border-surface-border bg-white flex items-center justify-between;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .sky-bg {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e8f4fd 40%, #f8fafc 100%);
+  }
+  .vibe-hero-bg {
+    background: linear-gradient(135deg, #0077b6 0%, #0d94d4 50%, #38aee8 100%);
+  }
+  .mesh-bg {
+    background:
+      radial-gradient(ellipse at 20% 50%, #0d94d415 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, #0077b615 0%, transparent 50%),
+      #ffffff;
+  }
+}
+
+/* ─── VIBE Real-time Chat additions ──────────────────────────────────────── */
+@layer components {
+  /* Slide-in animation for bottom sheets */
+  .animate-slide-in-up {
+    animation: slide-in-up 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @keyframes slide-in-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* Fade-in for dropdowns / modals */
+  .animate-fade-in {
+    animation: fade-in 0.15s ease-out;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  }
+
+  /* Shimmer for skeleton loading */
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .animate-shimmer {
+    animation: shimmer 1.6s ease-in-out infinite;
+    background: linear-gradient(90deg, #f0f4f8 25%, #e8f0f8 50%, #f0f4f8 75%);
+    background-size: 200% 100%;
+  }
+
+  /* Recording pulse ring */
+  .recording-ring {
+    @apply relative;
+  }
+  .recording-ring::after {
+    content: '';
+    @apply absolute inset-0 rounded-full border-2 border-red-400 animate-ping;
+  }
+
+  /* Message bubble hover toolbar */
+  .msg-toolbar {
+    @apply flex items-center bg-white border border-surface-border rounded-xl px-1 py-1 shadow-lg gap-0.5;
+  }
+
+  /* Reaction picker */
+  .reaction-picker {
+    @apply absolute bottom-full mb-1 bg-white border border-surface-border rounded-xl px-2 py-1.5 flex gap-1 shadow-xl z-50;
+    animation: fade-in 0.12s ease-out;
+  }
+
+  /* Status ring gradient */
+  .status-ring {
+    background: linear-gradient(135deg, #0d94d4, #38aee8, #10b981);
+    padding: 2px;
+    border-radius: 9999px;
+  }
+
+  /* AI Summary panel */
+  .ai-summary-panel {
+    @apply mx-4 mt-2 p-3 rounded-xl bg-gradient-to-r from-vibe-50 to-sky-50 border border-vibe-200;
+    animation: fade-in 0.2s ease-out;
+  }
+
+  /* Voice note progress */
+  .voice-progress-track {
+    @apply h-1.5 rounded-full overflow-hidden;
+  }
+  .voice-progress-fill {
+    @apply h-full rounded-full transition-all duration-200;
+  }
+
+  /* Typing bubble */
+  .typing-bubble {
+    @apply flex items-center gap-1 px-3 py-2 bg-white border border-surface-border rounded-2xl rounded-tl-sm;
+  }
+
+  /* Translation pill */
+  .translate-pill {
+    @apply inline-flex items-center gap-1 text-[10px] font-medium bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full;
+  }
+
+  /* Convo item active state */
+  .convo-item-active {
+    @apply bg-sky-50 border border-vibe-200 rounded-xl;
+  }
+}
+
+@layer utilities {
+  /* Prevent text selection during voice record press */
+  .select-none-during-record {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Custom thin scrollbar for message list */
+  .chat-scroll::-webkit-scrollbar { width: 3px; }
+  .chat-scroll::-webkit-scrollbar-thumb { background: #b3d9f5; border-radius: 99px; }
+
+  /* ─── EMOJI PICKER ─────────────────────────────────────────────────────────────
+   Add this block inside @layer components in your existing index.css
+   OR paste it at the bottom of the file — both work.
+   ─────────────────────────────────────────────────────────────────────────────*/
+
+  @layer components {
+    /* Emoji picker container */
+    .emoji-picker {
+      @apply absolute bottom-full mb-2 left-0 bg-white border border-surface-border rounded-2xl shadow-2xl z-50 overflow-hidden;
+      width: 340px;
+      animation: fade-in 0.15s ease-out;
+    }
+
+    /* Emoji picker search input */
+    .emoji-picker-search {
+      @apply w-full text-sm bg-sky-50 border border-surface-border rounded-xl px-3 py-2
+            focus:outline-none focus:border-vibe-400 placeholder:text-gray-400;
+    }
+
+    /* Category tab bar */
+    .emoji-cat-bar {
+      @apply flex overflow-x-auto scrollbar-none border-b border-surface-border bg-gray-50;
+    }
+
+    /* Individual category tab */
+    .emoji-cat-btn {
+      @apply flex-shrink-0 w-9 h-9 flex items-center justify-center text-base transition-colors hover:bg-gray-100;
+    }
+    .emoji-cat-btn.active {
+      @apply bg-vibe-50 border-b-2 border-vibe-500;
+    }
+
+    /* Emoji grid */
+    .emoji-grid {
+      @apply grid grid-cols-8 gap-0.5 px-2 py-1 overflow-y-auto scrollbar-none;
+      height: 13rem; /* 208px */
+    }
+
+    /* Individual emoji button */
+    .emoji-btn {
+      @apply w-9 h-9 flex items-center justify-center text-xl hover:bg-sky-50 rounded-lg transition-colors active:scale-90;
+    }
+
+    /* Quick reaction footer */
+    .emoji-quick-row {
+      @apply flex items-center gap-1 px-3 py-2 border-t border-surface-border bg-gray-50;
+    }
+  }
+
+  /* ─── ADD CONTACT MODAL ENHANCEMENTS ──────────────────────────────────────────*/
+  @layer components {
+    /* "Not on VIBE" amber banner */
+    .not-vibe-banner {
+      @apply rounded-2xl overflow-hidden border border-amber-200 bg-amber-50;
+    }
+    .not-vibe-banner-header {
+      @apply bg-amber-400 px-4 py-3 flex items-center gap-2;
+    }
+    .not-vibe-banner-body {
+      @apply p-4;
+    }
+
+    /* VIBE found card */
+    .vibe-found-card {
+      @apply bg-green-50 border border-green-200 rounded-2xl p-4;
+    }
+  }
+}

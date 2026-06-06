@@ -1,0 +1,45 @@
+server:
+  port: ${SERVER_PORT:8087}
+
+spring:
+  application:
+    name: ai-service
+
+  main:
+    allow-bean-definition-overriding: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:vibe_redis}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 100
+          max-idle: 20
+          min-idle: 5
+          max-wait: 2000ms
+
+vibe:
+  jwt:
+    secret: ${JWT_SECRET:ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph}
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.vibe: INFO

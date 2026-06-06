@@ -1,0 +1,517 @@
+version: '3.9'
+
+networks:
+  vibe-net:
+    driver: bridge
+
+# Shared environment variables for all Java microservices
+x-java-env: &java-env
+  JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+  JWT_SECRET: "ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph"
+  REDIS_HOST: vibe-redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: vibe_redis
+  KAFKA_SERVERS: vibe-kafka:29092
+  KAFKA_ENABLED: "true"
+  MONGO_HOST: vibe-mongodb
+  MONGO_PORT: "27017"
+  CORS_ORIGINS: "http://localhost:3000"
+
+services:
+
+  # ─────────────────────────────────────────
+  # DATABASES
+  # ─────────────────────────────────────────
+
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: vibe-postgres-auth
+    environment:
+      POSTGRES_DB: vibe_auth
+      POSTGRES_USER: vibe
+      POSTGRES_PASSWORD: vibe_local_2026
+    ports:
+      # Host 5442 to avoid clashing with a native Postgres already on 5432.
+      # Container still listens on 5432 internally; only the host port changed.
+      - "5442:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - vibe-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibe -d vibe_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-rewards:
+    image: postgres:15-alpine
+    container_name: vibe-postgres-rewards
+    environment:
+      POSTGRES_DB: vibe_rewards
+      POSTGRES_USER: vibe
+      POSTGRES_PASSWORD: vibe_local_2026
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-rewards-data:/var/lib/postgresql/data
+    networks:
+      - vibe-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibe -d vibe_rewards"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7.0
+    container_name: vibe-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: vibe
+      MONGO_INITDB_ROOT_PASSWORD: vibe_local_2026
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+      - ./infrastructure/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - vibe-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping')\" --username vibe --password vibe_local_2026 --authenticationDatabase admin || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: vibe-redis
+    command: >
+      redis-server
+      --requirepass vibe_redis
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - vibe-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "vibe_redis", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # MESSAGE BROKER
+  # ─────────────────────────────────────────
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: vibe-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    networks:
+      - vibe-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: vibe-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: vibe-zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://vibe-kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - vibe-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  # ─────────────────────────────────────────
+  # MICROSERVICES
+  # ─────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    image: vibe/auth-service:latest
+    container_name: vibe-auth-service
+    environment:
+      <<: *java-env
+      POSTGRES_AUTH_HOST: vibe-postgres-auth
+      SERVER_PORT: "8081"
+    ports:
+      - "8081:8081"
+    networks:
+      - vibe-net
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  messaging-service:
+    build:
+      context: .
+      dockerfile: messaging-service/Dockerfile
+    image: vibe/messaging-service:latest
+    container_name: vibe-messaging-service
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8082"
+    ports:
+      - "8082:8082"
+    networks:
+      - vibe-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  feed-service:
+    build:
+      context: .
+      dockerfile: feed-service/Dockerfile
+    image: vibe/feed-service:latest
+    container_name: vibe-feed-service
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8083"
+    ports:
+      - "8083:8083"
+    networks:
+      - vibe-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  rooms-service:
+    build:
+      context: .
+      dockerfile: rooms-service/Dockerfile
+    image: vibe/rooms-service:latest
+    container_name: vibe-rooms-service
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8084"
+    ports:
+      - "8084:8084"
+    networks:
+      - vibe-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  rewards-service:
+    build:
+      context: .
+      dockerfile: rewards-service/Dockerfile
+    image: vibe/rewards-service:latest
+    container_name: vibe-rewards-service
+    environment:
+      <<: *java-env
+      POSTGRES_REWARDS_HOST: vibe-postgres-rewards
+      POSTGRES_REWARDS_PORT: "5432"
+      SERVER_PORT: "8085"
+    ports:
+      - "8085:8085"
+    networks:
+      - vibe-net
+    depends_on:
+      postgres-rewards:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8085/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    image: vibe/notification-service:latest
+    container_name: vibe-notification-service
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8086"
+    ports:
+      - "8086:8086"
+    networks:
+      - vibe-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8086/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+    image: vibe/ai-service:latest
+    container_name: vibe-ai-service
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8087"
+      CLAUDE_API_KEY: "${CLAUDE_API_KEY:-}"
+    ports:
+      - "8087:8087"
+    networks:
+      - vibe-net
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8087/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  media-service:
+    build:
+      context: .
+      dockerfile: media-service/Dockerfile
+    image: vibe/media-service:latest
+    container_name: vibe-media-service
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8088"
+      MEDIA_UPLOAD_DIR: /app/uploads
+      MEDIA_BASE_URL: "http://localhost:8088/api/v1/media/files"
+    ports:
+      - "8088:8088"
+    volumes:
+      - media-uploads:/app/uploads
+    networks:
+      - vibe-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8088/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    image: vibe/api-gateway:latest
+    container_name: vibe-api-gateway
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8090"
+      AUTH_SERVICE_HOST: vibe-auth-service
+      MESSAGING_SERVICE_HOST: vibe-messaging-service
+      FEED_SERVICE_HOST: vibe-feed-service
+      ROOMS_SERVICE_HOST: vibe-rooms-service
+      REWARDS_SERVICE_HOST: vibe-rewards-service
+      NOTIFICATION_SERVICE_HOST: vibe-notification-service
+      AI_SERVICE_HOST: vibe-ai-service
+      MEDIA_SERVICE_HOST: vibe-media-service
+    ports:
+      - "8090:8090"
+    networks:
+      - vibe-net
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      messaging-service:
+        condition: service_healthy
+      feed-service:
+        condition: service_healthy
+      rooms-service:
+        condition: service_healthy
+      rewards-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8090/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  # ─────────────────────────────────────────
+  # TOOLING & MONITORING
+  # ─────────────────────────────────────────
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: vibe-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: vibe-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: vibe-kafka:29092
+    networks:
+      - vibe-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    container_name: vibe-mongo-express
+    ports:
+      - "8089:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: vibe
+      ME_CONFIG_MONGODB_ADMINPASSWORD: vibe_local_2026
+      ME_CONFIG_MONGODB_URL: "mongodb://vibe:vibe_local_2026@vibe-mongodb:27017/?authSource=admin"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: vibe2026
+    networks:
+      - vibe-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: vibe-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - vibe-net
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: vibe-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: vibe_grafana_2026
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - vibe-net
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  postgres-auth-data:
+  postgres-rewards-data:
+  mongodb-data:
+  redis-data:
+  zookeeper-data:
+  kafka-data:
+  prometheus-data:
+  grafana-data:
+  media-uploads:

@@ -1,0 +1,125 @@
+server:
+  port: ${SERVER_PORT:8081}
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 20
+    connection-timeout: 5000ms
+
+spring:
+  application:
+    name: vibe-auth-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_AUTH_HOST:localhost}:${POSTGRES_AUTH_PORT:5442}/vibe_auth
+    username: vibe
+    password: vibe_local_2026
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 3000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:vibe_redis}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 20
+          min-idle: 5
+          max-wait: 2000ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    listener:
+      auto-startup: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: 1
+      retries: 2
+      properties:
+        spring.json.add.type.headers: false
+        delivery.timeout.ms: 8000
+        request.timeout.ms: 3000
+        max.block.ms: 3000
+        linger.ms: 5
+        batch.size: 16384
+    consumer:
+      group-id: vibe-auth-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.vibe.*,java.util,java.lang"
+
+vibe:
+  jwt:
+    secret: ${JWT_SECRET:ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph}
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+  kafka:
+    enabled: ${KAFKA_ENABLED:true}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      kafkaPublisher:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+  retry:
+    instances:
+      kafkaPublisher:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.vibe: INFO
+    org.springframework.security: WARN

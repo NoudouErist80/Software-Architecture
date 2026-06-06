@@ -1,0 +1,24 @@
+# Build outputs
+target/
+*.jar
+*.war
+
+# Environment — NEVER commit secrets
+.env
+*.env.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml

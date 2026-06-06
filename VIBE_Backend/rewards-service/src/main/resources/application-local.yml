@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/vibe_rewards
+  data:
+    redis:
+      host: localhost
+      password: vibe_redis
+  kafka:
+    listener:
+      auto-startup: false
+
+logging:
+  level:
+    com.vibe: DEBUG

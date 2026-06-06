@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vibe-api-gateway
+  namespace: vibe
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vibe-api-gateway
+  template:
+    metadata:
+      labels:
+        app: vibe-api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: vibe/api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8090
+          envFrom:
+            - configMapRef:
+                name: vibe-config
+            - secretRef:
+                name: vibe-secrets
+          env:
+            - name: AUTH_SERVICE_HOST
+              value: "vibe-auth-service"
+            - name: MESSAGING_SERVICE_HOST
+              value: "vibe-messaging-service"
+            - name: FEED_SERVICE_HOST
+              value: "vibe-feed-service"
+            - name: ROOMS_SERVICE_HOST
+              value: "vibe-rooms-service"
+            - name: REWARDS_SERVICE_HOST
+              value: "vibe-rewards-service"
+            - name: NOTIFICATION_SERVICE_HOST
+              value: "vibe-notification-service"
+            - name: AI_SERVICE_HOST
+              value: "vibe-ai-service"
+            - name: MEDIA_SERVICE_HOST
+              value: "vibe-media-service"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vibe-api-gateway
+  namespace: vibe
+spec:
+  type: LoadBalancer
+  selector:
+    app: vibe-api-gateway
+  ports:
+    - port: 8090
+      targetPort: 8090

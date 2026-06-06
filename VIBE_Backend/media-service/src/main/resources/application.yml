@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: vibe-media-service
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
+      enabled: true
+
+vibe:
+  media:
+    upload-dir: ${MEDIA_UPLOAD_DIR:./media-uploads}
+    base-url: ${MEDIA_BASE_URL:http://localhost:8088/api/v1/media/files}
+    max-size-bytes: 104857600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.vibe: INFO

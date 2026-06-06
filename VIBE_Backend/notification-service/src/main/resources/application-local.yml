@@ -1,0 +1,11 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://vibe:vibe_local_2026@localhost:27017/vibe_notifications?authSource=admin
+  kafka:
+    listener:
+      auto-startup: false
+
+logging:
+  level:
+    com.vibe: DEBUG

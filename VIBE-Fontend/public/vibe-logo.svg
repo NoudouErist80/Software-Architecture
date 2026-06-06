@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="44" fill="#4e46c8"/>
+  <rect x="4" y="4" width="192" height="192" rx="40" fill="url(#bg)"/>
+  <!-- Sound bars - VIBE signature mark -->
+  <rect x="42" y="85" width="18" height="70" rx="9" fill="rgba(255,255,255,0.4)"/>
+  <rect x="68" y="55" width="18" height="100" rx="9" fill="rgba(255,255,255,0.55)"/>
+  <rect x="94" y="30" width="18" height="125" rx="9" fill="#ffffff"/>
+  <rect x="120" y="50" width="18" height="105" rx="9" fill="rgba(255,255,255,0.55)"/>
+  <rect x="146" y="78" width="18" height="77" rx="9" fill="rgba(255,255,255,0.4)"/>
+  <!-- Live dot -->
+  <circle cx="164" cy="42" r="14" fill="#e8345a"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4e46c8"/>
+      <stop offset="1" stop-color="#5c52d9"/>
+    </linearGradient>
+  </defs>
+</svg>

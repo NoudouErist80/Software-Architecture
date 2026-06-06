@@ -1,0 +1,185 @@
+server:
+  port: ${SERVER_PORT:8090}
+  netty:
+    connection-timeout: 5000ms
+
+spring:
+  application:
+    name: vibe-api-gateway
+
+  main:
+    web-application-type: reactive
+    allow-bean-definition-overriding: true
+
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "https://vibe.app"
+              - "${CORS_ORIGINS:http://localhost:3000}"
+            allowedMethods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"]
+            allowedHeaders: ["*"]
+            allowCredentials: true
+            maxAge: 3600
+
+      default-filters:
+        - AddRequestHeader=X-Request-ID, ${random.uuid}
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 30s
+        pool:
+          type: fixed
+          max-connections: 1000
+          acquire-timeout: 5000
+
+      routes:
+
+        # ── Auth Service ────────────────────────────────────────────────────────
+        - id: auth-service
+          uri: http://${AUTH_SERVICE_HOST:localhost}:8081
+          predicates:
+            - Path=/auth/**
+          filters:
+            - RewritePath=/auth(?<segment>/?.*), /api/v1/auth${segment}
+            - name: Retry
+              args:
+                retries: 2
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                methods: GET
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+
+        # ── Messaging REST API ──────────────────────────────────────────────────
+        - id: messaging-service-rest
+          uri: http://${MESSAGING_SERVICE_HOST:localhost}:8082
+          predicates:
+            - Path=/messaging/**
+          filters:
+            - RewritePath=/messaging(?<segment>/?.*), /api/v1/messaging${segment}
+
+        # ── WebSocket / SockJS — messaging service ──────────────────────────────
+        #
+        # SockJS negotiation involves three phases, all routed here:
+        #
+        #   Phase 1 (HTTP):
+        #     GET  /ws/messaging/info          → transport capability check
+        #
+        #   Phase 2 (HTTP — fallback transports):
+        #     POST /ws/messaging/<server>/<sid>/xhr
+        #     GET  /ws/messaging/<server>/<sid>/xhr_streaming
+        #     GET  /ws/messaging/<server>/<sid>/eventsource
+        #     GET  /ws/messaging/<server>/<sid>/htmlfile
+        #     GET  /ws/messaging/<server>/<sid>/jsonp
+        #
+        #   Phase 3 (WebSocket upgrade):
+        #     GET  /ws/messaging/<server>/<sid>/websocket  (+Upgrade: websocket)
+        #
+        # Spring Cloud Gateway's WebsocketRoutingFilter only upgrades requests
+        # that carry the "Upgrade: websocket" header.  All other requests on
+        # this path (SockJS info + fallback polling) must be routed via HTTP.
+        # Using `lb:ws://` for HTTP requests would cause the gateway to reject
+        # non-upgrade requests with "400 Invalid Upgrade header", which is
+        # exactly the error seen in the logs.
+        #
+        # Solution: use a plain `http://` URI here.  Spring Cloud Gateway is
+        # smart enough to perform the WebSocket upgrade transparently when the
+        # client sends the correct Upgrade header, while also serving all of
+        # the SockJS HTTP handshake requests without error.
+        - id: ws-messaging
+          uri: http://${MESSAGING_SERVICE_HOST:localhost}:8082
+          predicates:
+            - Path=/ws/messaging/**
+          # No RewritePath filter: the path is forwarded as-is to port 8082
+          # where Spring's SockJS server expects /ws/messaging/*.
+
+        # ── Feed Service ────────────────────────────────────────────────────────
+        - id: feed-service
+          uri: http://${FEED_SERVICE_HOST:localhost}:8083
+          predicates:
+            - Path=/feed/**
+          filters:
+            - RewritePath=/feed(?<segment>/?.*), /api/v1/feed${segment}
+
+        # ── Rooms Service ───────────────────────────────────────────────────────
+        - id: rooms-service
+          uri: http://${ROOMS_SERVICE_HOST:localhost}:8084
+          predicates:
+            - Path=/rooms/**
+          filters:
+            - RewritePath=/rooms(?<segment>/?.*), /api/v1/rooms${segment}
+
+        # ── Rewards Service ─────────────────────────────────────────────────────
+        - id: rewards-service
+          uri: http://${REWARDS_SERVICE_HOST:localhost}:8085
+          predicates:
+            - Path=/rewards/**
+          filters:
+            - RewritePath=/rewards(?<segment>/?.*), /api/v1/rewards${segment}
+
+        # ── Notification Service ────────────────────────────────────────────────
+        - id: notification-service
+          uri: http://${NOTIFICATION_SERVICE_HOST:localhost}:8086
+          predicates:
+            - Path=/notifications/**
+          filters:
+            - RewritePath=/notifications(?<segment>/?.*), /api/v1/notifications${segment}
+
+        # ── AI Service ──────────────────────────────────────────────────────────
+        - id: ai-service
+          uri: http://${AI_SERVICE_HOST:localhost}:8087
+          predicates:
+            - Path=/ai/**
+          filters:
+            - RewritePath=/ai(?<segment>/?.*), /api/v1/ai${segment}
+
+        # ── Media Service ───────────────────────────────────────────────────────
+        - id: media-service
+          uri: http://${MEDIA_SERVICE_HOST:localhost}:8088
+          predicates:
+            - Path=/media/**
+          filters:
+            - RewritePath=/media(?<segment>/?.*), /api/v1/media${segment}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:vibe_redis}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 100
+          max-idle: 20
+          min-idle: 5
+          max-wait: 2000ms
+
+vibe:
+  jwt:
+    secret: ${JWT_SECRET:ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph}
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.vibe: INFO
+    org.springframework.cloud.gateway: WARN

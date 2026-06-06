@@ -1,0 +1,44 @@
+server:
+  port: ${SERVER_PORT:8086}
+
+spring:
+  application:
+    name: vibe-notification-service
+
+  data:
+    mongodb:
+      uri: mongodb://vibe:vibe_local_2026@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/vibe_notifications?authSource=admin
+      auto-index-creation: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    listener:
+      auto-startup: ${KAFKA_ENABLED:true}
+    consumer:
+      group-id: vibe-notification-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Values are read as raw JSON strings and converted to each @KafkaListener's
+      # parameter type by the StringJsonMessageConverter bean (see KafkaConsumerConfig).
+      # Producers send JSON WITHOUT type headers (spring.json.add.type.headers=false),
+      # so a plain JsonDeserializer cannot infer the target type; a StringDeserializer
+      # also never wedges the consumer on a malformed record.
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+vibe:
+  jwt:
+    secret: ${JWT_SECRET:ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.vibe: INFO

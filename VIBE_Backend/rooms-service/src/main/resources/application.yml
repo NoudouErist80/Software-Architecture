@@ -1,0 +1,46 @@
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: vibe-rooms-service
+
+  data:
+    mongodb:
+      uri: mongodb://vibe:vibe_local_2026@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/vibe_rooms?authSource=admin
+      auto-index-creation: true
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:vibe_redis}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    listener:
+      auto-startup: ${KAFKA_ENABLED:true}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        delivery.timeout.ms: 8000
+        request.timeout.ms: 3000
+        max.block.ms: 3000
+
+vibe:
+  jwt:
+    secret: ${JWT_SECRET:ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.vibe: INFO

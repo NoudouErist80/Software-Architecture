@@ -1,0 +1,116 @@
+server:
+  port: ${SERVER_PORT:8083}
+  tomcat:
+    threads:
+      max: 400
+      min-spare: 50
+    accept-count: 200
+    connection-timeout: 5000ms
+  compression:
+    enabled: true
+    mime-types: application/json
+
+spring:
+  application:
+    name: vibe-feed-service
+
+  data:
+    mongodb:
+      uri: mongodb://vibe:vibe_local_2026@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/vibe_feed?authSource=admin
+      # CRITICAL: auto-index-creation MUST be false in production.
+      # Indexes are managed explicitly in MongoIndexConfig to prevent
+      # startup failures from index conflicts (exactly what broke this service).
+      auto-index-creation: false
+      # MongoDB connection pool — tuned for high concurrency
+      uuid-representation: standard
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:vibe_redis}
+      timeout: 2000ms
+      connect-timeout: 1000ms
+      # Lettuce connection pool (commons-pool2 is on classpath)
+      lettuce:
+        pool:
+          max-active: 200       # max concurrent connections
+          max-idle: 50
+          min-idle: 20
+          max-wait: 1000ms      # fail fast rather than queue forever
+        shutdown-timeout: 200ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    listener:
+      auto-startup: ${KAFKA_ENABLED:true}
+      concurrency: 6            # parallel partition consumers
+      ack-mode: manual_immediate
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: 1                   # balance durability vs throughput for feed events
+      retries: 3
+      properties:
+        spring.json.add.type.headers: false
+        delivery.timeout.ms: 8000
+        request.timeout.ms: 3000
+        max.block.ms: 3000
+        linger.ms: 5            # micro-batch for throughput
+        batch.size: 32768       # 32KB batches
+    consumer:
+      group-id: vibe-feed-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "com.vibe.*"
+        max.poll.records: 500
+        fetch.min.bytes: 1024
+        fetch.max.wait.ms: 500
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 60000
+      cache-null-values: false
+
+  # Jackson global config
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+vibe:
+  jwt:
+    secret: ${JWT_SECRET:ViBe_Super_Secret_2026_Africa_TchangoNoudouJoseph}
+  feed:
+    max-page-size: 50
+    default-page-size: 20
+    search-result-limit: 30
+    status-expiry-hours: 24
+  scheduler:
+    # Cron: every hour — kept for soft-delete fallback only (MongoDB TTL is primary)
+    status-cleanup-cron: "0 0 * * * *"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    com.vibe: INFO
+    org.springframework.data.mongodb: WARN
+    org.springframework.kafka: WARN

@@ -1,0 +1,26 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://vibe:vibe_local_2026@localhost:27017/vibe_feed?authSource=admin
+      # Keep auto-index-creation OFF even locally — use MongoIndexConfig instead.
+      # This ensures local behaviour matches production exactly.
+      auto-index-creation: false
+    redis:
+      host: localhost
+      password: vibe_redis
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 2
+          max-wait: 500ms
+
+  kafka:
+    listener:
+      auto-startup: false       # don't require Kafka running locally
+
+logging:
+  level:
+    com.vibe: DEBUG
+    org.springframework.data.mongodb.core.index: DEBUG   # see index creation in logs
+    org.springframework.data.mongodb: DEBUG

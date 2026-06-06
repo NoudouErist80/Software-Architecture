@@ -1,0 +1,38 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# LOCAL DEVELOPMENT PROFILE — messaging-service
+# Usage: mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+# ══════════════════════════════════════════════════════════════════════════════
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://vibe:vibe_local_2026@localhost:27017/vibe_messaging?authSource=admin
+    redis:
+      host: localhost
+      password: vibe_redis
+  kafka:
+    bootstrap-servers: localhost:9092
+    listener:
+      # Set to false to avoid Kafka connection errors when Kafka is not running locally.
+      # Messages are still saved to MongoDB and delivered via WebSocket.
+      # Set to true only when Kafka is running (for token reward events).
+      auto-startup: false
+
+vibe:
+  kafka:
+    enabled: false
+
+  # ─── AI Service URL ─────────────────────────────────────────────────────────
+  # ROOT CAUSE FIX: was pointing to port 8084 (wrong) — ai-service runs on 8087.
+  # This caused AiSummaryService.callAiSummarise() to fail with "Connection refused"
+  # every time the messaging-service tried to call the AI service internally.
+  # The frontend now sends transcripts directly so this is a belt-and-braces fix,
+  # but it ensures internal messaging→ai calls also work correctly.
+  ai:
+    base-url: http://localhost:8087
+
+logging:
+  level:
+    com.vibe: DEBUG
+    org.springframework.web.socket: INFO
+    org.springframework.messaging: INFO

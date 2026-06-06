@@ -1,0 +1,96 @@
+---
+# VIBE Playbook 2: Install and Configure Nginx as Reverse Proxy
+# Run: ansible-playbook -i inventory/hosts.yml playbooks/02-configure-nginx.yml
+
+- name: Configure Nginx reverse proxy for VIBE
+  hosts: all
+  become: yes
+  vars:
+    domain: "{{ vibe_domain | default('vibe.yourdomain.com') }}"
+  tasks:
+    - name: Install Nginx and Certbot
+      apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+        update_cache: yes
+
+    - name: Create VIBE Nginx configuration
+      copy:
+        content: |
+          upstream vibe-auth {
+              server 127.0.0.1:8081;
+          }
+          upstream vibe-messaging {
+              server 127.0.0.1:8082;
+          }
+          upstream vibe-rewards {
+              server 127.0.0.1:8085;
+          }
+
+          server {
+              listen 80;
+              server_name {{ domain }};
+
+              # API routing to microservices
+              location /api/v1/auth/ {
+                  proxy_pass http://vibe-auth;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+
+              location /api/v1/messaging/ {
+                  proxy_pass http://vibe-messaging;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+
+              # WebSocket proxy for real-time messaging
+              location /ws/ {
+                  proxy_pass http://vibe-messaging;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "Upgrade";
+                  proxy_set_header Host $host;
+                  proxy_read_timeout 86400;
+              }
+
+              location /api/v1/rewards/ {
+                  proxy_pass http://vibe-rewards;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+
+              # Gzip compression for performance
+              gzip on;
+              gzip_types text/plain application/json application/javascript text/css;
+              gzip_min_length 1000;
+          }
+        dest: /etc/nginx/sites-available/vibe
+        mode: '0644'
+
+    - name: Enable VIBE Nginx site
+      file:
+        src: /etc/nginx/sites-available/vibe
+        dest: /etc/nginx/sites-enabled/vibe
+        state: link
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+    - debug:
+        msg: "{{ nginx_test.stderr }}"
+
+    - name: Restart Nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
